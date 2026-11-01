@@ -1,0 +1,79 @@
+# Server image — HTTP API only
+#
+# Role:
+#   server  — HTTP API, /metrics, /livez, /readyz on SERVER_HTTP_ADDR (default :8080)
+#
+# Run the server: docker run <image>
+#
+# Probes:
+#   server: GET /livez and /readyz on SERVER_HTTP_ADDR (e.g. :8080)
+#
+# Environment variables:
+#   Common:     DATABASE_URL, DATABASE_REPLICA_URL, MONGO_URL, MONGO_DATABASE,
+#               REDIS_URL, KAFKA_BROKERS, ENV, LOG_LEVEL, LOG_FORMAT
+#   Server:     SERVER_HTTP_ADDR, JWT_SECRET, ADMIN_USERNAMES, AUTH_ACCESS_TOKEN_TTL,
+#               AUTH_REFRESH_TOKEN_TTL, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW,
+#               RBAC_PERMISSIONS_CACHE_TTL
+
+# syntax=docker/dockerfile:1
+
+# Build arguments
+ARG GO_VERSION=1.27.4
+ARG APP_VERSION=dev
+
+# Stage 1: Dependencies (cache go module downloads)
+FROM golang:${GO_VERSION}-alpine AS deps
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download && go mod verify
+
+# Stage 2: Builder (compile the static binary)
+FROM golang:${GO_VERSION}-alpine AS builder
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /build
+COPY . .
+
+ARG APP_VERSION
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go tool swag init -g main.go -o docs --parseInternal && \
+    CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath -buildvcs=false \
+    -ldflags="-w -s -X minimart/cmd.version=${APP_VERSION}" \
+    -o /app/minimart .
+
+# Stage 3: Runtime (scratch with minimal files)
+FROM scratch
+
+# The global APP_VERSION is only available in FROM lines; re-declare here for LABEL.
+ARG APP_VERSION
+
+# Image metadata
+LABEL maintainer="andretads@gmail.com"
+LABEL version="${APP_VERSION}"
+
+# Essential file systems from builder
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Binary
+COPY --from=builder /app/minimart /app/minimart
+
+# Working directory
+WORKDIR /app
+
+# Ports: 8080 (HTTP)
+EXPOSE 8080
+
+# Security: run as non-root user
+USER 65534:65534
+
+# Graceful shutdown on SIGTERM
+STOPSIGNAL SIGTERM
+
+# One binary, server role
+ENTRYPOINT ["/app/minimart"]
+CMD ["server"]

@@ -1,0 +1,282 @@
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: minimart-db
+    environment:
+      POSTGRES_USER: minimart
+      POSTGRES_PASSWORD: minimart
+      POSTGRES_DB: minimart
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minimart"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: minimart-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: minimart-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  floci:
+    image: floci/floci:latest-compat
+    container_name: minimart-floci
+    ports:
+      - "9000:4566"
+      - "9001:4566"
+    environment:
+      FLOCI_ACCESS_KEY: "minioadmin"
+      FLOCI_SECRET_KEY: "minioadmin"
+      S3_BUCKET: "minimart"
+    volumes:
+      - floci_data:/data
+      - ./docker/floci/init/ready.d:/etc/floci/init/ready.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "aws s3api head-bucket --bucket minimart >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: minimart-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --kafka-addr=PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redpanda-init:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: minimart-redpanda-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for topic in order-placed order-cancelled order-stock-release order-paid payment-initiated payment-succeeded payment-failed payment-unknown payment-refunded review-created review-moderated shipment-created shipment-shipped shipment-delivered notification-email notification-sms notification-push; do
+          rpk topic create "$$topic" -X brokers=redpanda:29092 -p 6 -r 1 || true
+          rpk topic create "$$topic.dlq" -X brokers=redpanda:29092 -p 6 -r 1 -c retention.ms=1209600000 || \
+            rpk topic alter-config "$$topic.dlq" -X brokers=redpanda:29092 --set retention.ms=1209600000
+        done
+    restart: "no"
+
+  ollama:
+    profiles:
+      - moderation
+    image: ollama/ollama:latest
+    container_name: minimart-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ollama-pull:
+    profiles:
+      - moderation
+    image: ollama/ollama:latest
+    container_name: minimart-ollama-pull
+    entrypoint: ["sh", "-c", "sleep 15 && ollama pull llama-guard3:1b"]
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: minimart-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ../deployments/docker/prometheus/prometheus-local.yml:/etc/prometheus/prometheus.yml:ro
+      - ../deployments/docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: minimart-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../deployments/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../deployments/docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: minimart-gateway
+    command: ["gateway"]
+    environment:
+      GATEWAY_HTTP_ADDR: ":8080"
+      GATEWAY_UPSTREAM: "http://server:8080"
+      GATEWAY_CORS_ORIGINS: "*"
+      GATEWAY_CORS_CREDENTIALS: "true"
+      REDIS_URL: "redis://redis:6379/0"
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "json"
+      ENV: "development"
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - gateway
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: minimart-server
+    command: ["server"]
+    environment:
+      SERVER_HTTP_ADDR: ":8080"
+      DATABASE_URL: "postgres://minimart:minimart@db:5432/minimart?sslmode=disable"
+      DATABASE_REPLICA_URL: "postgres://minimart:minimart@db:5432/minimart?sslmode=disable"
+      MONGO_URL: "mongodb://mongo:27017"
+      MONGO_DATABASE: "minimart"
+      REDIS_URL: "redis://redis:6379/0"
+      KAFKA_BROKERS: "redpanda:29092"
+      JWT_SECRET: "minimart-local-dev-secret-change-me"
+      MODERATION_ENABLED: "true"
+      MODERATION_ENDPOINT: "http://ollama:11434"
+      MODERATION_MODEL: "llama-guard3:1b"
+      MODERATION_TIMEOUT: "30s"
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "json"
+      ENV: "development"
+      S3_ENDPOINT: "http://floci:4566"
+      S3_PUBLIC_ENDPOINT: "http://localhost:9000"
+      S3_BUCKET: "minimart"
+      S3_REGION: "us-east-1"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_USE_PATH_STYLE: "true"
+      S3_PRESIGN_TTL: "1h"
+      S3_MAX_UPLOAD_SIZE_MB: "5"
+    ports:
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      floci:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: minimart-worker
+    environment:
+      DATABASE_URL: "postgres://minimart:minimart@db:5432/minimart?sslmode=disable"
+      DATABASE_REPLICA_URL: "postgres://minimart:minimart@db:5432/minimart?sslmode=disable"
+      MONGO_URL: "mongodb://mongo:27017"
+      MONGO_DATABASE: "minimart"
+      REDIS_URL: "redis://redis:6379/0"
+      KAFKA_BROKERS: "redpanda:29092"
+      WORKER_HTTP_ADDR: ":8081"
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "json"
+      ENV: "development"
+      S3_ENDPOINT: "http://floci:4566"
+      S3_PUBLIC_ENDPOINT: "http://localhost:9000"
+      S3_BUCKET: "minimart"
+      S3_REGION: "us-east-1"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_USE_PATH_STYLE: "true"
+      S3_PRESIGN_TTL: "1h"
+      S3_MAX_UPLOAD_SIZE_MB: "5"
+      MODERATION_ENABLED: "true"
+      MODERATION_ENDPOINT: "http://ollama:11434"
+      MODERATION_MODEL: "llama-guard3:1b"
+      MODERATION_TIMEOUT: "30s"
+    ports:
+      - "8082:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      floci:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:
+  floci_data:
+  grafana_data:
+  prometheus_data:
+  ollama_data:
