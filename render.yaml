@@ -1,0 +1,129 @@
+# Render Blueprint for MiniMart
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: minimart-server
+    runtime: docker
+    dockerfilePath: backend/Dockerfile.server
+    dockerContext: backend
+    region: oregon
+    plan: starter
+    healthCheckPath: /livez
+    envVars:
+      - key: ENV
+        value: production
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: info
+      - key: SERVER_HTTP_ADDR
+        value: ":10000"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_REPLICA_URL
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: MONGO_DATABASE
+        value: minimart
+      - key: REDIS_URL
+        sync: false
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAMES
+        sync: false
+      - key: COOKIE_DOMAIN
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        value: minimart
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_USE_PATH_STYLE
+        value: "false"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: RESEND_REPLY_TO
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: worker
+    name: minimart-worker
+    runtime: docker
+    dockerfilePath: backend/Dockerfile.worker
+    dockerContext: backend
+    region: oregon
+    plan: starter
+    envVars:
+      - key: ENV
+        value: production
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: info
+      - key: WORKER_HTTP_ADDR
+        value: ":10000"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_REPLICA_URL
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: MONGO_DATABASE
+        value: minimart
+      - key: REDIS_URL
+        sync: false
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        value: minimart
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_USE_PATH_STYLE
+        value: "false"
+
+  - type: web
+    name: minimart-frontend
+    runtime: static
+    buildCommand: |
+      npm ci
+      sed -i "s|__API_BASE_URL__|${API_BASE_URL:-}|" src/environments/environment.production.ts
+      sed -i "s|__SENTRY_DSN__|${SENTRY_DSN:-}|" src/environments/environment.production.ts
+      sed -i "s|__POSTHOG_KEY__|${POSTHOG_KEY:-}|" src/environments/environment.production.ts
+      sed -i "s|__POSTHOG_HOST__|${POSTHOG_HOST:-https://us.i.posthog.com}|" src/environments/environment.production.ts
+      npm run build
+    staticPublishPath: dist/frontend/browser
+    rootDir: frontend
+    envVars:
+      - key: API_BASE_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: POSTHOG_KEY
+        sync: false
+      - key: POSTHOG_HOST
+        value: https://us.i.posthog.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

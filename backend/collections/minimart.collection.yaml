@@ -1,0 +1,2042 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: MiniMart API
+meta:
+  id: wrk_minimart
+  description: |
+    Insomnia collection for the MiniMart HTTP API (auth, catalog, cart, order,
+    payment, shipping, customer, notification, showcase).
+
+    All endpoints live under /v1. Auth endpoints handle signup, login, token refresh, and current user info.
+    Base URL defaults to http://localhost:8080 (server SERVER_HTTP_ADDR default).
+
+    The requests form a happy-path flow and share state through environment
+    variables set by after-response scripts (product_id, product_version,
+    product_etag, cart_id, cart_order_id, shipping_method_id,
+    shipping_quote_id, shipment_id, order_id, payment_id, customer_id,
+    notification_id). Run requests top-to-bottom within each folder, or use the
+    Collection Runner for the whole flow.
+
+    Note: notifications are produced asynchronously by the Kafka worker from
+    OrderPlaced events, so the Notification requests may return empty results
+    until a worker has processed an order.
+
+    Note: the cart endpoints are unauthenticated and identify the caller by the
+    user_id query parameter, so they need no Authorization header.
+collection:
+  - name: Auth
+    meta:
+      id: fld_auth
+      sortKey: -4500000000000
+      description: |
+        Authentication and authorization endpoints. SignUp creates an account
+        and provisions a customer record. Login issues access and refresh JWTs
+        as HttpOnly cookies. Refresh uses the refresh token cookie to renew both
+        cookies (sliding session). Me returns the current user's info using the
+        access token cookie. Logout clears both cookies and is safe to call
+        without a valid access token. All endpoints use cookies for authentication.
+    children:
+      - name: Sign Up
+        meta:
+          id: req_signup
+          sortKey: -4500000000001
+          description: |
+            Creates a new user account. Responds 201 with the account in `data`
+            (id, username, created_at). 409 when username already exists.
+        url: "{{ _.base_url }}/v1/auth/signup"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "username": "testuser",
+              "password": "password123"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('sign up returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.username).to.eql('testuser');
+            });
+      - name: Login
+        meta:
+          id: req_login
+          sortKey: -4500000000002
+          description: |
+            Authenticates a user and sets access (mm_at) and refresh (mm_rt)
+            tokens as HttpOnly cookies. Set `remember_me` to true to receive the
+            longer refresh-token lifetime. Responds 200 with the user and the
+            access-token expiry in `data` (id, username, email, created_at,
+            access_token_expires_at, expires_in). 401 for invalid credentials.
+        url: "{{ _.base_url }}/v1/auth/login"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "username": "testuser",
+              "password": "password123"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('login returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string');
+              insomnia.expect(body.data.username).to.eql('testuser');
+              insomnia.expect(body.data.access_token_expires_at).to.be.a('string');
+              insomnia.expect(body.data.expires_in).to.be.a('number');
+            });
+      - name: Refresh Token
+        meta:
+          id: req_refresh
+          sortKey: -4500000000003
+          description: |
+            Uses the refresh token cookie (mm_rt) to renew both the access
+            (mm_at) and refresh (mm_rt) cookies. Responds 200 with
+            { "status": "refreshed", "access_token_expires_at", "expires_in" }.
+            401 when the refresh token is invalid or expired.
+        url: "{{ _.base_url }}/v1/auth/refresh"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: "{}"
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('refresh returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('refreshed');
+              insomnia.expect(body.data.access_token_expires_at).to.be.a('string');
+              insomnia.expect(body.data.expires_in).to.be.a('number');
+            });
+      - name: Get Current User
+        meta:
+          id: req_me
+          sortKey: -4500000000004
+          description: |
+            Returns the current authenticated user's information using the
+            access token cookie (mm_at). Responds 200 with the user and the
+            access-token expiry in `data` (id, username, email, created_at,
+            access_token_expires_at, expires_in). 401 when unauthenticated.
+        url: "{{ _.base_url }}/v1/auth/me"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('me returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string');
+              insomnia.expect(body.data.username).to.eql('testuser');
+              insomnia.expect(body.data.access_token_expires_at).to.be.a('string');
+              insomnia.expect(body.data.expires_in).to.be.a('number');
+            });
+      - name: Change Password
+        meta:
+          id: req_change_password
+          sortKey: -4500000000005
+          description: |
+            Changes the authenticated user's password. Requires the access token
+            cookie (mm_at) and the current password. The new password must match
+            its confirmation. Responds 200 with { "status": "password_changed" }.
+
+            Note: this mutates the account password. After running it, update the
+            Login request to use the new password before running the collection
+            again.
+        url: "{{ _.base_url }}/v1/auth/change-password"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "current_password": "password123",
+              "new_password": "password456",
+              "confirm_new_password": "password456"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('change password returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('password_changed');
+            });
+      - name: Logout
+        meta:
+          id: req_logout
+          sortKey: -4500000000006
+          description: |
+            Clears the access (mm_at) and refresh (mm_rt) cookies. Logout is
+            public, so it succeeds even when the access token has expired.
+            Responds 200 with { "status": "logged_out" }.
+        url: "{{ _.base_url }}/v1/auth/logout"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: "{}"
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('logout returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('logged_out');
+            });
+  - name: Catalog
+    meta:
+      id: fld_catalog
+      sortKey: -4000000000000
+      description: |
+        Product management with optimistic locking (ETag / If-Match / If-None-Match).
+        Run requests in order: Create Product seeds product_id, product_version
+        and product_etag used by the later requests.
+    children:
+      - name: Create Product
+        meta:
+          id: req_create_product
+          sortKey: -4000000000001
+          description: |
+            Creates a product. Responds 201 with the product in `data` and an
+            `ETag` header (the product version, e.g. "1"). Product images are
+            added separately through the product image endpoints.
+            Seeds product_id, product_version and product_etag.
+        url: "{{ _.base_url }}/v1/products"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: multipart/form-data
+        parameters:
+          - name: name
+            value: "Gizmo"
+          - name: price_cents
+            value: "100"
+          - name: stock
+            value: "10"
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('create product returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.name).to.eql('Gizmo');
+              insomnia.expect(body.data.price_cents).to.eql(100);
+              insomnia.expect(body.data.stock).to.eql(10);
+              insomnia.expect(body.data.version).to.eql(1);
+            });
+            if (insomnia.response.status === 201) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('product_id', body.data.id);
+              insomnia.environment.set('product_version', body.data.version);
+              insomnia.environment.set('product_etag', headers.etag || headers.ETag || '');
+            }
+      - name: List Products
+        meta:
+          id: req_list_products
+          sortKey: -4000000000002
+          description: |
+            Lists the entire catalog (no pagination). Responds 200 with an array
+            in `data` (empty array when there are no products).
+        url: "{{ _.base_url }}/v1/products"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list products returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              body.data.forEach(product => {
+                insomnia.expect(product.images).to.be.an('array');
+                product.images.forEach(image => {
+                  insomnia.expect(image.url).to.be.a('string');
+                });
+              });
+            });
+      - name: Get Product
+        meta:
+          id: req_get_product
+          sortKey: -4000000000003
+          description: |
+            Fetches a product by id. Responds 200 with the product in `data` and
+            a fresh `ETag` header. 404 when the product does not exist.
+            Refreshes product_etag.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get product returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('product_id'));
+              insomnia.expect(body.data.images).to.be.an('array');
+              body.data.images.forEach(image => {
+                insomnia.expect(image.url).to.be.a('string');
+              });
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('product_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Get Product (If-None-Match)
+        meta:
+          id: req_get_product_inm
+          sortKey: -4000000000004
+          description: |
+            Conditional GET with the ETag from a previous response. Responds
+            304 Not Modified (empty body) when the ETag still matches.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}"
+        method: GET
+        headers:
+          - name: If-None-Match
+            value: '{{ _.product_etag }}'
+        scripts:
+          afterResponse: |-
+            insomnia.test('conditional get returns 304', () => {
+              insomnia.expect(insomnia.response.status).to.eql(304);
+            });
+      - name: Add Product Image
+        meta:
+          id: req_add_product_image
+          sortKey: -40000000000045
+          description: |
+            Uploads an image and appends it to the product. Responds 201 with the
+            image in `data`. Adding an image bumps the product version.
+            Seeds product_image_id.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}/images"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: multipart/form-data
+        parameters:
+          - name: image
+            value: ""
+            fileName: "product.jpg"
+            type: file
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('add product image returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.product_id).to.eql(insomnia.environment.get('product_id'));
+              insomnia.expect(body.data.url).to.be.a('string');
+            });
+            if (insomnia.response.status === 201) {
+              insomnia.environment.set('product_image_id', body.data.id);
+            }
+      - name: List Product Images
+        meta:
+          id: req_list_product_images
+          sortKey: -40000000000046
+          description: |
+            Lists a product's images ordered by position. The first image is the
+            primary image. Responds 200 with an array in `data`.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}/images"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list product images returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+            });
+      - name: Delete Product Image
+        meta:
+          id: req_delete_product_image
+          sortKey: -40000000000047
+          description: |
+            Removes an image from a product. Responds 204 with an empty body.
+            Deleting an image bumps the product version.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}/images/{{ _.product_image_id }}"
+        method: DELETE
+        scripts:
+          afterResponse: |-
+            insomnia.test('delete product image returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Update Product (If-Match)
+        meta:
+          id: req_update_product_if_match
+          sortKey: -4000000000005
+          description: |
+            Partial update using optimistic locking via the If-Match header (the
+            recommended way; overrides any version in the body). Responds 200 with
+            the updated product and a new ETag. 409 when the ETag is stale.
+            Stock is preserved server-side and cannot be changed here.
+            Product images are managed through the dedicated image endpoints.
+            Refreshes product_version and product_etag.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: multipart/form-data
+          - name: If-Match
+            value: '{{ _.product_etag }}'
+        parameters:
+          - name: name
+            value: "Gizmo Mk II"
+          - name: price_cents
+            value: "150"
+          - name: version
+            value: '{{ _.product_version }}'
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update product via If-Match returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.name).to.eql('Gizmo Mk II');
+              insomnia.expect(body.data.price_cents).to.eql(150);
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('product_version', body.data.version);
+              insomnia.environment.set('product_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Update Product (version in body)
+        meta:
+          id: req_update_product_body_version
+          sortKey: -4000000000006
+          description: |
+            Alternative optimistic locking: send the current version in the body
+            instead of the If-Match header. Responds 200 with the updated product.
+            409 when the version is stale.
+            Refreshes product_version.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Gizmo Mk III",
+              "price_cents": 175,
+              "version":{{ _.product_version }}
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update product via body version returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.name).to.eql('Gizmo Mk III');
+              insomnia.expect(body.data.version).to.eql(insomnia.environment.get('product_version') + 1);
+            });
+            if (insomnia.response.status === 200) {
+              insomnia.environment.set('product_version', body.data.version);
+            }
+      - name: Update Product (stale ETag, 409)
+        meta:
+          id: req_update_product_conflict
+          sortKey: -4000000000007
+          description: |
+            Demonstrates a lock conflict: sends a stale If-Match value and
+            expects 409 "conflito de bloqueio do produto".
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: If-Match
+            value: '"99"'
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Gizmo Stale",
+              "price_cents": 999
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('stale If-Match returns 409', () => {
+              insomnia.expect(insomnia.response.status).to.eql(409);
+              insomnia.expect(body.error.message).to.eql('conflito de bloqueio do produto');
+            });
+      - name: Add Product Review
+        meta:
+          id: req_add_product_review
+          sortKey: -4000000000008
+          description: |
+            Adds a review for a product. Requires authentication (access token cookie)
+            and the `reviews:write` permission, which the customer and admin roles
+            hold. The review is attributed to the signed in customer, so no customer
+            id is sent in the body. Reviews start as pending for moderation.
+            Responds 201 with the review in `data`.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}/reviews"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "description": "Great product!",
+              "rating": 5
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('add product review returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string');
+              insomnia.expect(body.data.product_id).to.eql(insomnia.environment.get('product_id'));
+              insomnia.expect(body.data.customer_id).to.be.a('string');
+              insomnia.expect(body.data.description).to.eql('Great product!');
+              insomnia.expect(body.data.rating).to.eql(5);
+              insomnia.expect(body.data.status).to.eql('pending');
+            });
+      - name: List Product Reviews
+        meta:
+          id: req_list_product_reviews
+          sortKey: -4000000000009
+          description: |
+            Lists the approved reviews of a product. Requires authentication
+            (access token cookie) and the `catalog:read` permission, which the
+            customer, support and admin roles hold. Responds 200 with a `data`
+            array (possibly empty). The public read path is the showcase
+            reviews endpoint.
+        url: "{{ _.base_url }}/v1/products/{{ _.product_id }}/reviews"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list product reviews returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              body.data.forEach((review) => {
+                insomnia.expect(review.status).to.eql('approved');
+                insomnia.expect(review.rating).to.be.a('number');
+                insomnia.expect(review.created_at).to.be.a('string');
+              });
+            });
+  - name: Category
+    meta:
+      id: fld_category
+      sortKey: -3900000000000
+      description: |
+        Category management with optimistic locking (ETag / If-Match / If-None-Match).
+        Run requests in order: Create Category seeds category_id, category_version
+        and category_etag used by the later requests.
+    children:
+      - name: Create Category
+        meta:
+          id: req_create_category
+          sortKey: -3900000000001
+          description: |
+            Creates a category. Responds 201 with the category in `data` and an
+            `ETag` header (the category version, e.g. "1").
+            Seeds category_id, category_version and category_etag.
+        url: "{{ _.base_url }}/v1/categories"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Electronics",
+              "icon": "📱"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('create category returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.name).to.eql('Electronics');
+              insomnia.expect(body.data.icon).to.eql('📱');
+              insomnia.expect(body.data.version).to.eql(1);
+            });
+            if (insomnia.response.status === 201) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('category_id', body.data.id);
+              insomnia.environment.set('category_version', body.data.version);
+              insomnia.environment.set('category_etag', headers.etag || headers.ETag || '');
+            }
+      - name: List Categories
+        meta:
+          id: req_list_categories
+          sortKey: -3900000000002
+          description: |
+            Lists all categories (no pagination). Responds 200 with an array
+            in `data` (empty array when there are no categories).
+        url: "{{ _.base_url }}/v1/categories"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list categories returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+            });
+      - name: Get Category
+        meta:
+          id: req_get_category
+          sortKey: -3900000000003
+          description: |
+            Fetches a category by id. Responds 200 with the category in `data` and
+            a fresh `ETag` header. 404 when the category does not exist.
+            Refreshes category_etag.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get category returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('category_id'));
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('category_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Get Category (If-None-Match)
+        meta:
+          id: req_get_category_inm
+          sortKey: -3900000000004
+          description: |
+            Fetches a category by id with If-None-Match header. Returns 304
+            when the category is unchanged.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+          - name: If-None-Match
+            value: "{{ _.category_etag }}"
+        scripts:
+          afterResponse: |-
+            insomnia.test('get category with If-None-Match returns 304', () => {
+              insomnia.expect(insomnia.response.status).to.eql(304);
+            });
+      - name: Update Category (If-Match header)
+        meta:
+          id: req_update_category_if_match
+          sortKey: -3900000000005
+          description: |
+            Updates a category's name and icon using If-Match header for optimistic locking.
+            Responds 200 with the updated category. 409 when the version is stale.
+            Refreshes category_version and category_etag.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: If-Match
+            value: "{{ _.category_etag }}"
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Electronics & Gadgets",
+              "icon": "🔌"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update category via If-Match returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.name).to.eql('Electronics & Gadgets');
+              insomnia.expect(body.data.icon).to.eql('🔌');
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('category_version', body.data.version);
+              insomnia.environment.set('category_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Update Category (version in body)
+        meta:
+          id: req_update_category_body_version
+          sortKey: -3900000000006
+          description: |
+            Alternative optimistic locking: send the current version in the body
+            instead of the If-Match header. Responds 200 with the updated category.
+            409 when the version is stale.
+            Refreshes category_version.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Electronics & Accessories",
+              "icon": "🎧",
+              "version": {{ _.category_version }}
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update category via body version returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.name).to.eql('Electronics & Accessories');
+              insomnia.expect(body.data.version).to.eql(insomnia.environment.get('category_version') + 1);
+            });
+            if (insomnia.response.status === 200) {
+              insomnia.environment.set('category_version', body.data.version);
+            }
+      - name: Update Category (stale If-Match, 409)
+        meta:
+          id: req_update_category_conflict
+          sortKey: -3900000000007
+          description: |
+            Demonstrates a lock conflict: sends a stale If-Match value and
+            expects 409 "category lock conflict".
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: If-Match
+            value: '"99"'
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Stale Category",
+              "icon": "📦"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('stale If-Match returns 409', () => {
+              insomnia.expect(insomnia.response.status).to.eql(409);
+              insomnia.expect(body.error.message).to.eql('category: conflito de bloqueio');
+            });
+      - name: Delete Category
+        meta:
+          id: req_delete_category
+          sortKey: -3900000000008
+          description: |
+            Deletes a category by id with exact If-Match version. Responds 204.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: DELETE
+        headers:
+          - name: If-Match
+            value: "{{ _.category_etag }}"
+        scripts:
+          afterResponse: |-
+            insomnia.test('delete category returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Delete Category (missing If-Match, 400)
+        meta:
+          id: req_delete_category_missing_if_match
+          sortKey: -3900000000009
+          description: |
+            Attempts to delete a category without If-Match header. Responds 400.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: DELETE
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('delete category without If-Match returns 400', () => {
+              insomnia.expect(insomnia.response.status).to.eql(400);
+              insomnia.expect(body.error.message).to.eql('cabeçalho If-Match obrigatório');
+            });
+      - name: Delete Category (stale If-Match, 409)
+        meta:
+          id: req_delete_category_conflict
+          sortKey: -3900000000010
+          description: |
+            Attempts to delete a category with a stale If-Match version. Responds 409.
+        url: "{{ _.base_url }}/v1/categories/{{ _.category_id }}"
+        method: DELETE
+        headers:
+          - name: If-Match
+            value: '"99"'
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('delete category with stale If-Match returns 409', () => {
+              insomnia.expect(insomnia.response.status).to.eql(409);
+              insomnia.expect(body.error.message).to.eql('category: conflito de bloqueio');
+            });
+  - name: Showcase
+    meta:
+      id: fld_showcase
+      sortKey: -3800000000000
+      description: |
+        Public product display with pagination. No authentication required.
+        Run requests in order: List Showcase Products (paginated), Get Showcase Product.
+    children:
+      - name: List Showcase Products
+        meta:
+          id: req_list_showcase_products
+          sortKey: -3800000000001
+          description: |
+            Lists all products in the showcase, newest first, with keyset pagination.
+            Responds 200 with `data` array and `meta` object (page_size, next_cursor, has_more).
+            No authentication required.
+        url: "{{ _.base_url }}/v1/showcase/products"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        parameters:
+          - name: page_size
+            value: "20"
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list showcase products returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              insomnia.expect(body.meta).to.be.an('object');
+              insomnia.expect(body.meta.page_size).to.eql(20);
+              insomnia.expect(body.meta.has_more).to.be.a('boolean');
+              insomnia.expect(body.data.every((p) => typeof p.stock === 'number')).to.eql(true);
+              insomnia.expect(body.data.every((p) => typeof p.total_rating === 'number')).to.eql(true);
+              insomnia.expect(body.data.every((p) => typeof p.total_reviews === 'number')).to.eql(true);
+            });
+            if (body.meta && body.meta.next_cursor) {
+              insomnia.environment.set('showcase_cursor', body.meta.next_cursor);
+            }
+      - name: List Showcase Products (next page)
+        meta:
+          id: req_list_showcase_products_p2
+          sortKey: -3800000000002
+          description: |
+            Lists the next page of showcase products using the cursor from the previous request.
+        url: "{{ _.base_url }}/v1/showcase/products"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        parameters:
+          - name: page_size
+            value: "2"
+          - name: cursor
+            value: "{{ _.showcase_cursor }}"
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list showcase products next page returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              insomnia.expect(body.meta.page_size).to.eql(2);
+            });
+      - name: Get Showcase Product
+        meta:
+          id: req_get_showcase_product
+          sortKey: -3800000000003
+          description: |
+            Fetches a showcase product by id. Responds 200 with the product in `data`.
+            404 when the product does not exist.
+            No authentication required. Seeds showcase_product_id.
+        url: "{{ _.base_url }}/v1/showcase/products/{{ _.showcase_product_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get showcase product returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.name).to.be.a('string');
+              insomnia.expect(body.data.price_cents).to.be.a('number');
+              insomnia.expect(body.data.stock).to.be.a('number');
+              insomnia.expect(body.data.total_rating).to.be.a('number');
+              insomnia.expect(body.data.total_reviews).to.be.a('number');
+              insomnia.expect(body.data.images).to.be.an('array');
+            });
+            if (insomnia.response.status === 200) {
+              insomnia.environment.set('showcase_product_id', body.data.id);
+            }
+      - name: List Showcase Product Reviews
+        meta:
+          id: req_list_showcase_product_reviews
+          sortKey: -3800000000005
+          description: |
+            Lists the approved reviews of a showcase product, newest first.
+            Responds 200 with a `data` array (possibly empty).
+            No authentication required. Uses showcase_product_id seeded by Get Showcase Product.
+        url: "{{ _.base_url }}/v1/showcase/products/{{ _.showcase_product_id }}/reviews"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list showcase product reviews returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              body.data.forEach((review) => {
+                insomnia.expect(review.status).to.eql('approved');
+                insomnia.expect(review.rating).to.be.a('number');
+                insomnia.expect(review.created_at).to.be.a('string');
+              });
+            });
+      - name: Get Showcase Product (not found)
+        meta:
+          id: req_get_showcase_product_not_found
+          sortKey: -3800000000004
+          description: |
+            Fetches a showcase product with an invalid ID. Responds 404.
+        url: "{{ _.base_url }}/v1/showcase/products/invalid-id"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get showcase product not found returns 404', () => {
+              insomnia.expect(insomnia.response.status).to.eql(404);
+              insomnia.expect(body.success).to.eql(false);
+              insomnia.expect(body.error.message).to.eql('produto não encontrado');
+            });
+  - name: Shipping
+    meta:
+      id: fld_shipping
+      sortKey: -3400000000000
+      description: |
+        Shipping quotes, shipments and tracking. A quote snapshots the
+        delivery address and the shipping cost for one method; the cart
+        checkout consumes it and stores the snapshot on the order. A shipment
+        is created by the worker when the order is paid, so the shipment
+        requests need a paid order (Payment > Create Payment) and a running
+        worker.
+    children:
+      - name: List Shipping Methods
+        meta:
+          id: req_list_shipping_methods
+          sortKey: -3400000000001
+          description: |
+            Lists the active shipping methods. Responds 200 with the methods
+            in `data` (id, name, description, estimated_min_days,
+            estimated_max_days). Seeds shipping_method_id.
+        url: "{{ _.base_url }}/v1/shipping/methods"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list shipping methods returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              insomnia.expect(body.data.every(m => m.active)).to.eql(true);
+            });
+            if (insomnia.response.status === 200 && body.data.length > 0) {
+              insomnia.environment.set('shipping_method_id', body.data[0].id);
+            }
+      - name: Create Shipping Quote
+        meta:
+          id: req_create_shipping_quote
+          sortKey: -3400000000002
+          description: |
+            Quotes a shipping method for one of the caller's addresses. The
+            quote snapshots the destination and the shipping cost, and is what
+            the cart checkout turns into the order's shipping snapshot.
+            `subtotal_cents` is the cart total the customer is shopping with:
+            a subtotal at the rate's free threshold makes the quote free. It is
+            advisory - the cart checkout re-prices the quote with the subtotal
+            it computed, so the amount charged never depends on this number.
+            The Idempotency-Key header is required (400 when missing) and makes
+            the call safe to retry: the same key returns the same quote, while
+            the same key with different parameters is a conflict (409).
+            Responds 201 with the quote in `data`. 400 for an unknown method
+            or address, 404 when the address does not belong to the caller.
+            Seeds shipping_quote_id.
+        url: "{{ _.base_url }}/v1/shipping/quotes"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Idempotency-Key
+            value: "{{ _.idempotency_key }}"
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "method_id": "{{ _.shipping_method_id }}",
+              "address_id": "{{ _.address_id }}",
+              "subtotal_cents": {{ _.cart_subtotal_cents }}
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('create shipping quote returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string');
+              insomnia.expect(body.data.status).to.eql('active');
+              insomnia.expect(body.data.shipping_cost_cents).to.be.a('number');
+              insomnia.expect(body.data.subtotal_cents).to.be.a('number');
+              insomnia.expect(body.data.free_threshold_cents).to.be.a('number');
+              insomnia.expect(body.data.destination_snapshot).to.be.an('object');
+            });
+            if (insomnia.response.status === 201) {
+              insomnia.environment.set('shipping_quote_id', body.data.id);
+            }
+      - name: Get Shipment Tracking Events
+        meta:
+          id: req_get_shipment_tracking_events
+          sortKey: -3400000000003
+          description: |
+            Returns the tracking history of a shipment, oldest first. Responds
+            200 with the events in `data` (id, shipment_id, status,
+            description, location, occurred_at). 404 when the shipment does
+            not exist, 403 when it belongs to another user.
+        url: "{{ _.base_url }}/v1/shipping/shipments/{{ _.shipment_id }}/events"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get shipment tracking events returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+            });
+  - name: Cart
+    meta:
+      id: fld_cart
+      sortKey: -3250000000000
+      description: |
+        Shopping cart. The cart is a MongoDB document per customer, addressed by
+        the authenticated user (access-token cookie). Requires a product to exist
+        (Catalog > Create Product), since names and prices are resolved
+        server-side. Checkout places an order through the order domain and
+        requires an Idempotency-Key header; it consumes the cart, and the next
+        request starts a fresh one.
+    children:
+      - name: Get Cart
+        meta:
+          id: req_get_cart
+          sortKey: -3250000000001
+          description: |
+            Returns the authenticated user's cart, creating one when none
+            exists. Responds 200 with the cart in `data` (id, customer_id,
+            status, items, estimated_total_cents, timestamps). Seeds cart_id.
+        url: "{{ _.base_url }}/v1/cart"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get cart returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.status).to.eql('active');
+              insomnia.expect(body.data.items).to.be.an('array');
+              insomnia.expect(body.data.estimated_total_cents).to.be.a('number');
+            });
+            if (insomnia.response.status === 200) {
+              insomnia.environment.set('cart_id', body.data.id);
+              insomnia.environment.set('cart_subtotal_cents', body.data.estimated_total_cents);
+            }
+      - name: Add Item
+        meta:
+          id: req_add_cart_item
+          sortKey: -3250000000002
+          description: |
+            Adds a product to the cart. When the product is already in the cart
+            its quantity is incremented instead. Responds 200 with the updated
+            cart in `data`. 400 for an invalid quantity or an unknown product,
+            404 when the product does not exist in the catalog.
+        url: "{{ _.base_url }}/v1/cart/items"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "product_id": "{{ _.product_id }}",
+              "quantity": 2
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('add cart item returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.items).to.have.lengthOf(1);
+              insomnia.expect(body.data.items[0].product_id).to.eql(insomnia.environment.get('product_id'));
+              insomnia.expect(body.data.items[0].quantity).to.eql(2);
+              insomnia.expect(body.data.items[0].line_total_cents).to.eql(body.data.items[0].unit_price_snapshot_cents * 2);
+            });
+      - name: Update Item Quantity
+        meta:
+          id: req_update_cart_item
+          sortKey: -3250000000003
+          description: |
+            Sets the quantity of a product already in the cart. Responds 200 with
+            the updated cart in `data`. 400 for a quantity below 1, 404 when the
+            product is not in the cart.
+        url: "{{ _.base_url }}/v1/cart/items/{{ _.product_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "quantity": 3
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update cart item returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.items).to.have.lengthOf(1);
+              insomnia.expect(body.data.items[0].quantity).to.eql(3);
+            });
+      - name: Checkout Cart
+        meta:
+          id: req_checkout_cart
+          sortKey: -3250000000004
+          description: |
+            Turns the cart into an order. The Idempotency-Key header is
+            required (400 when missing) and makes the call safe to retry: the
+            same key returns the same order. A shipping quote and an address
+            are required too: the quote's destination becomes the order's
+            shipping snapshot, which the shipping domain turns into a shipment
+            when the order is paid. The shipping cost is re-priced here
+            against the cart's own subtotal, so the rate's free shipping
+            threshold applies to what the cart actually holds. Responds 201
+            with the order in `data` (order_id, user_id, customer_id, status,
+            total_cents). 400 for an empty cart or a missing quote, 409 when
+            the cart is not active or the order conflicts. Seeds
+            cart_order_id.
+        url: "{{ _.base_url }}/v1/cart/checkout"
+        method: POST
+        headers:
+          - name: Idempotency-Key
+            value: "{{ _.idempotency_key }}"
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "shipping_quote_id": "{{ _.shipping_quote_id }}",
+              "address_id": "{{ _.address_id }}"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('checkout cart returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.order_id).to.be.a('string');
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+              insomnia.expect(body.data.status).to.eql('placed');
+              insomnia.expect(body.data.total_cents).to.be.a('number');
+            });
+            if (insomnia.response.status === 201) {
+              insomnia.environment.set('cart_order_id', body.data.order_id);
+            }
+      - name: Add Item (after checkout)
+        meta:
+          id: req_add_cart_item_after_checkout
+          sortKey: -3250000000005
+          description: |
+            Checkout consumes the cart, so the next request starts a fresh one.
+            Adding an item creates it again. Responds 200 with the new cart in
+            `data`.
+        url: "{{ _.base_url }}/v1/cart/items"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "product_id": "{{ _.product_id }}",
+              "quantity": 1
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('add cart item after checkout returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('active');
+              insomnia.expect(body.data.items).to.have.lengthOf(1);
+            });
+      - name: Remove Item
+        meta:
+          id: req_remove_cart_item
+          sortKey: -3250000000006
+          description: |
+            Removes a product from the cart. Responds 200 with the updated cart
+            in `data`. 404 when the product is not in the cart.
+        url: "{{ _.base_url }}/v1/cart/items/{{ _.product_id }}"
+        method: DELETE
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('remove cart item returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.items).to.have.lengthOf(0);
+            });
+      - name: Clear Cart
+        meta:
+          id: req_clear_cart
+          sortKey: -3250000000007
+          description: |
+            Removes every item from the cart; the cart itself stays active.
+            Responds 204 with an empty body.
+        url: "{{ _.base_url }}/v1/cart"
+        method: DELETE
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            insomnia.test('clear cart returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+  - name: Order
+    meta:
+      id: fld_order
+      sortKey: -3000000000000
+      description: |
+        Placing and cancelling orders. Requires a product to exist (Catalog >
+        Create Product), since prices are resolved server-side from the catalog.
+        Run requests in order: Place Order seeds order_id.
+    children:
+      - name: Place Order
+        meta:
+          id: req_place_order
+          sortKey: -3000000000001
+          description: |
+            Places an order. Prices are not sent; they are resolved from the
+            catalog. Responds 201 with the order in `data` (items include name,
+            unit_price_cents and line_total_cents). A placed order also carries
+            `auto_cancel_at`. 400 for an empty item list, zero quantity or an
+            unknown product. Seeds order_id.
+        url: "{{ _.base_url }}/v1/orders"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "user_id": "{{ _.user_id }}",
+              "items": [
+                {
+                  "product_id": "{{ _.product_id }}",
+                  "quantity": 2
+                }
+              ]
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('place order returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string');
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+              insomnia.expect(body.data.status).to.eql('placed');
+              insomnia.expect(body.data.total_cents).to.be.a('number');
+              insomnia.expect(body.data.items).to.have.lengthOf(1);
+            });
+            if (insomnia.response.status === 201) {
+              insomnia.environment.set('order_id', body.data.id);
+            }
+      - name: List Orders
+        meta:
+          id: req_list_orders
+          sortKey: -3000000000002
+          description: |
+            Lists one user's orders, newest first. Send user_id plus optional
+            page (1-based) and page_size (default 20, max 100). Responds 200
+            with the orders in `data` and pagination metadata in `meta`.
+        url: "{{ _.base_url }}/v1/orders?user_id={{ _.user_id }}&page=1&page_size=20"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list orders returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+              insomnia.expect(body.meta.page).to.eql(1);
+              insomnia.expect(body.meta.page_size).to.eql(20);
+              insomnia.expect(body.meta.total).to.be.at.least(1);
+              insomnia.expect(body.data.every(o => o.user_id === insomnia.environment.get('user_id'))).to.eql(true);
+            });
+      - name: Get Order
+        meta:
+          id: req_get_order
+          sortKey: -3000000000003
+          description: |
+            Fetches an order by id. Responds 200 with the order in `data`.
+            404 when the order does not exist. Status is "placed" or "cancelled".
+            A placed order also carries `auto_cancel_at`.
+            An order placed through the cart carries its shipping snapshot:
+            shipping_quote_id, shipping_method_id, shipping_method_name,
+            shipping_cost_cents and destination_snapshot.
+        url: "{{ _.base_url }}/v1/orders/{{ _.order_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get order returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('order_id'));
+              insomnia.expect(body.data.status).to.be.oneOf(['placed', 'cancelled']);
+              insomnia.expect(body.data.shipping_cost_cents).to.be.a('number');
+              insomnia.expect(body.data.shipping_method_name).to.be.a('string');
+              if (body.data.shipping_quote_id) {
+                insomnia.expect(body.data.destination_snapshot).to.be.an('object');
+                insomnia.expect(body.data.destination_snapshot.full_name).to.be.a('string');
+              }
+            });
+      - name: Cancel Order
+        meta:
+          id: req_cancel_order
+          sortKey: -3000000000004
+          description: |
+            Cancels a placed order. Responds 200 with the cancelled order
+            (status "cancelled", cancelled_at set). 404 when unknown,
+            409 when already cancelled.
+        url: "{{ _.base_url }}/v1/orders/{{ _.order_id }}/cancel"
+        method: POST
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('cancel order returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('cancelled');
+              insomnia.expect(body.data.cancelled_at).to.be.a('string');
+            });
+      - name: Cancel Order (already cancelled, 409)
+        meta:
+          id: req_cancel_order_conflict
+          sortKey: -3000000000005
+          description: |
+            Cancelling the same order again. Expects 409
+            "pedido já está cancelado".
+        url: "{{ _.base_url }}/v1/orders/{{ _.order_id }}/cancel"
+        method: POST
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('second cancel returns 409', () => {
+              insomnia.expect(insomnia.response.status).to.eql(409);
+              insomnia.expect(body.error.message).to.eql('pedido já está cancelado');
+            });
+  - name: Payment
+    meta:
+      id: fld_payment
+      sortKey: -2500000000000
+      description: |
+        Payment processing for orders. Requires an Idempotency-Key header for
+        POST /v1/payments. The fake provider approves by default; specific
+        amounts can trigger decline (PAYMENT_FAKE_DECLINE_AMOUNT_CENTS) or
+        timeout (PAYMENT_FAKE_TIMEOUT_AMOUNT_CENTS).
+    children:
+      - name: Create Payment
+        meta:
+          id: req_create_payment
+          sortKey: -2500000000001
+          description: |
+            Creates and processes a payment for an order. The Idempotency-Key
+            header is required; a retry with the same key and parameters returns
+            the original payment, while the same key with different parameters
+            is a conflict (409). Responds 201 with the payment in `data`.
+            Seeds payment_id.
+        url: "{{ _.base_url }}/v1/payments"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Idempotency-Key
+            value: "{{ _.idempotency_key }}"
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "order_id": "{{ _.order_id }}",
+              "user_id": "{{ _.user_id }}",
+              "amount_cents": 200,
+              "currency": "USD",
+              "method": "card"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('create payment returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.order_id).to.eql(insomnia.environment.get('order_id'));
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+              insomnia.expect(body.data.amount_cents).to.eql(200);
+              insomnia.expect(body.data.currency).to.eql('USD');
+              insomnia.expect(body.data.method).to.eql('card');
+              insomnia.expect(body.data.status).to.be.oneOf(['pending', 'succeeded', 'failed', 'unknown', 'refunded']);
+            });
+            if (insomnia.response.status === 201) {
+              insomnia.environment.set('payment_id', body.data.id);
+            }
+      - name: Get Payment
+        meta:
+          id: req_get_payment
+          sortKey: -2500000000002
+          description: |
+            Fetches a payment by id. Responds 200 with the payment in `data`.
+            404 when the payment does not exist.
+        url: "{{ _.base_url }}/v1/payments/{{ _.payment_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get payment returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('payment_id'));
+            });
+      - name: Refund Payment
+        meta:
+          id: req_refund_payment
+          sortKey: -2500000000003
+          description: |
+            Refunds a succeeded payment whose order was cancelled. Responds
+            200 with the refunded payment in `data` (status `refunded`);
+            refunding an already-refunded payment returns it unchanged. 404
+            when the payment does not exist, 409 when the payment is not
+            refundable or its order is not cancelled, 502 when the payment
+            provider fails the refund.
+        url: "{{ _.base_url }}/v1/payments/{{ _.payment_id }}/refund"
+        method: POST
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('refund payment returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('payment_id'));
+              insomnia.expect(body.data.status).to.eql('refunded');
+            });
+  - name: Customer
+    meta:
+      id: fld_customer
+      sortKey: -3500000000000
+      description: |
+        Customer profile management. CreateCustomer assigns a unique CustomerID
+        linked to a UserID. GetCustomerByUserID resolves an authenticated user.
+        No Idempotency-Key required — the user_id UNIQUE index is the backstop.
+    children:
+      - name: Create Customer
+        meta:
+          id: req_create_customer
+          sortKey: -3500000000001
+          description: |
+            Creates a customer record linked to the provided UserID. Responds
+            201 with the customer in `data` (id, user_id, display_name, status,
+            version, created_at, updated_at). 409 when user_id already exists.
+            Seeds customer_id, customer_version and customer_etag.
+        url: "{{ _.base_url }}/v1/customers"
+        method: POST
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "user_id": "{{ _.user_id }}",
+              "display_name": "Test User"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('create customer returns 201', () => {
+              insomnia.expect(insomnia.response.status).to.eql(201);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.be.a('string').that.has.lengthOf(26).and.match(/^[A-Z2-7]+$/);
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+              insomnia.expect(body.data.display_name).to.eql('Test User');
+              insomnia.expect(body.data.status).to.eql('active');
+              insomnia.expect(body.data.version).to.eql(1);
+            });
+            if (insomnia.response.status === 201) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('customer_id', body.data.id);
+              insomnia.environment.set('customer_version', body.data.version);
+              insomnia.environment.set('customer_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Get Customer
+        meta:
+          id: req_get_customer
+          sortKey: -3500000000002
+          description: |
+            Fetches a customer by CustomerID. Responds 200 with the customer in
+            `data` and an `ETag` header. 404 when unknown.
+            Refreshes customer_etag.
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get customer returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('customer_id'));
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('customer_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Get Customer (If-None-Match)
+        meta:
+          id: req_get_customer_inm
+          sortKey: -3500000000003
+          description: |
+            Conditional GET with the ETag from a previous response. Responds
+            304 Not Modified (empty body) when the ETag still matches.
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}"
+        method: GET
+        headers:
+          - name: If-None-Match
+            value: '{{ _.customer_etag }}'
+        scripts:
+          afterResponse: |-
+            insomnia.test('conditional get returns 304', () => {
+              insomnia.expect(insomnia.response.status).to.eql(304);
+            });
+      - name: Get Customer by UserID
+        meta:
+          id: req_get_customer_by_user_id
+          sortKey: -3500000000003
+          description: |
+            Resolves an authenticated user's UserID to their CustomerID. The
+            user_id query parameter is required (400 when missing). Responds 200
+            with the customer in `data` and an `ETag` header. 404 when no customer
+            exists for the user_id. Refreshes customer_etag.
+        url: "{{ _.base_url }}/v1/customers"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        parameters:
+          - name: user_id
+            value: '{{ _.user_id }}'
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get customer by user_id returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+            });
+      - name: Get Customer by UserID (If-None-Match)
+        meta:
+          id: req_9f57924be1e5490ea58458616de539cb
+          sortKey: -3500000000004
+          description: |
+            Conditional GET with the ETag from a previous response. Responds
+            304 Not Modified (empty body) when the ETag still matches.
+        url: "{{ _.base_url }}/v1/customers"
+        method: GET
+        headers:
+          - name: If-None-Match
+            value: '{{ _.customer_etag }}'
+        parameters:
+          - name: user_id
+            value: '{{ _.user_id }}'
+        scripts:
+          afterResponse: |-
+            insomnia.test('conditional get returns 304', () => {
+              insomnia.expect(insomnia.response.status).to.eql(304);
+            });
+      - name: Update Customer (If-Match)
+        meta:
+          id: req_2c8a086a96dc42bea5c48f2c098f090f
+          sortKey: -3500000000004
+          description: |
+            Partial update using optimistic locking via the If-Match header (the
+            recommended way; overrides any version in the body). Responds 200 with
+            the updated customer and a new ETag. 409 when the ETag is stale.
+            Refreshes customer_version and customer_etag.
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: If-Match
+            value: '{{ _.customer_etag }}'
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "display_name": "Updated Name"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update customer via If-Match returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.display_name).to.eql('Updated Name');
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('customer_version', body.data.version);
+              insomnia.environment.set('customer_etag', headers.etag || headers.ETag || '');
+            }
+      - name: Update Customer (version in body)
+        meta:
+          id: req_750632f993ab4f54ab5cb68e51f1c67f
+          sortKey: -3500000000005
+          description: |
+            Alternative optimistic locking: send the current version in the body
+            instead of the If-Match header. Responds 200 with the updated customer.
+            409 when the version is stale.
+            Refreshes customer_version.
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "display_name": "Updated Name v2",
+              "version":{{ _.customer_version }}
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update customer via body version returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.display_name).to.eql('Updated Name v2');
+              insomnia.expect(body.data.version).to.eql(insomnia.environment.get('customer_version') + 1);
+            });
+            if (insomnia.response.status === 200) {
+              insomnia.environment.set('customer_version', body.data.version);
+            }
+      - name: Update Customer (stale ETag, 409)
+        meta:
+          id: req_317e6011daa94be787db544a215fecee
+          sortKey: -3500000000006
+          description: |
+            Demonstrates a lock conflict: sends a stale If-Match value and
+            expects 409 "customer: conflito de bloqueio".
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}"
+        method: PATCH
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: If-Match
+            value: '"99"'
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "display_name": "Stale Name"
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('stale If-Match returns 409', () => {
+              insomnia.expect(insomnia.response.status).to.eql(409);
+              insomnia.expect(body.error.message).to.eql('customer: conflito de bloqueio');
+            });
+      - name: Deactivate Customer
+        meta:
+          id: req_0ecd679d9e85464cb7e2245970de8ae6
+          sortKey: -3500000000007
+          description: |
+            Deactivates a customer (idempotent). Responds 200 with the
+            deactivated customer in `data` (status "deactivated",
+            deactivated_at set, version bumped). 404 when unknown.
+        url: "{{ _.base_url }}/v1/customers/{{ _.customer_id }}/deactivate"
+        method: POST
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('deactivate customer returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.status).to.eql('deactivated');
+              insomnia.expect(body.data.deactivated_at).to.be.a('string');
+              insomnia.expect(body.data.version).to.be.a('number').that.is.at.least(2);
+            });
+            if (insomnia.response.status === 200) {
+              const headers = insomnia.response.headers || {};
+              insomnia.environment.set('customer_version', body.data.version);
+              insomnia.environment.set('customer_etag', headers.etag || headers.ETag || '');
+            }
+  - name: Notification
+    meta:
+      id: fld_notification
+      sortKey: -2000000000000
+      description: |
+        Read-only view over user notifications plus the authenticated user's
+        notification preferences. Notifications are written by the Kafka worker
+        from business events (not by the HTTP API), so results appear
+        asynchronously after placing an order and require the worker to be
+        running (make worker). Preferences are self-service and derive the user
+        from the access-token cookie; a disabled category makes the worker skip
+        that notification entirely.
+    children:
+      - name: List Notifications
+        meta:
+          id: req_list_notifications
+          sortKey: -2000000000001
+          description: |
+            Lists the authenticated user's notifications, newest first. Responds
+            200 with an array in `data` (empty when none exist yet).
+            Seeds notification_id from the first item when present.
+        url: "{{ _.base_url }}/v1/notifications"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('list notifications returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data).to.be.an('array');
+            });
+            if (insomnia.response.status === 200 && Array.isArray(body.data) && body.data.length > 0) {
+              insomnia.environment.set('notification_id', body.data[0].id);
+            }
+      - name: Get Notification
+        meta:
+          id: req_get_notification
+          sortKey: -2000000000002
+          description: |
+            Fetches a notification by id. Responds 200 with the notification in
+            `data`. 404 when unknown. Requires List Notifications to have found
+            at least one notification first; type is currently always
+            "order_confirmation".
+        url: "{{ _.base_url }}/v1/notifications/{{ _.notification_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get notification returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.id).to.eql(insomnia.environment.get('notification_id'));
+              insomnia.expect(body.data.type).to.eql('order_confirmation');
+              insomnia.expect(body.data.user_id).to.eql(insomnia.environment.get('user_id'));
+            });
+      - name: Mark Notification Read
+        meta:
+          id: req_mark_notification_read
+          sortKey: -20000000000015
+          description: |
+            Marks a single notification as read for the authenticated user.
+        url: "{{ _.base_url }}/v1/notifications/{{ _.notification_id }}/read"
+        method: POST
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('mark notification read returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Mark Notification Unread
+        meta:
+          id: req_mark_notification_unread
+          sortKey: -20000000000016
+          description: |
+            Marks a single notification as unread for the authenticated user.
+        url: "{{ _.base_url }}/v1/notifications/{{ _.notification_id }}/unread"
+        method: POST
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('mark notification unread returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Mark All Notifications Read
+        meta:
+          id: req_mark_all_notifications_read
+          sortKey: -20000000000017
+          description: |
+            Marks all of the authenticated user's notifications as read.
+        url: "{{ _.base_url }}/v1/notifications/read-all"
+        method: POST
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('mark all notifications read returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Delete Notification
+        meta:
+          id: req_delete_notification
+          sortKey: -20000000000018
+          description: |
+            Deletes a notification for the authenticated user.
+        url: "{{ _.base_url }}/v1/notifications/{{ _.notification_id }}"
+        method: DELETE
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('delete notification returns 204', () => {
+              insomnia.expect(insomnia.response.status).to.eql(204);
+            });
+      - name: Get Notification Preferences
+        meta:
+          id: req_get_notification_preferences
+          sortKey: -2000000000003
+          description: |
+            Returns the authenticated user's notification switches. A user who
+            has never saved any receives the defaults: order updates,
+            promotions, and security alerts on, newsletter off. Requires an
+            access-token cookie.
+        url: "{{ _.base_url }}/v1/notifications/preferences"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get notification preferences returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.order_updates).to.be.a('boolean');
+              insomnia.expect(body.data.promotions).to.be.a('boolean');
+              insomnia.expect(body.data.security_alerts).to.be.a('boolean');
+              insomnia.expect(body.data.newsletter).to.be.a('boolean');
+            });
+      - name: Update Notification Preferences
+        meta:
+          id: req_update_notification_preferences
+          sortKey: -2000000000004
+          description: |
+            Replaces all four switches for the authenticated user. All fields
+            are required (400 when any is missing). Responds 200 with the saved
+            preferences. The body below restores the defaults.
+        url: "{{ _.base_url }}/v1/notifications/preferences"
+        method: PUT
+        headers:
+          - name: Content-Type
+            value: application/json
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "order_updates": true,
+              "promotions": true,
+              "security_alerts": true,
+              "newsletter": false
+            }
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('update notification preferences returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.order_updates).to.eql(true);
+              insomnia.expect(body.data.newsletter).to.eql(false);
+              insomnia.expect(body.data.updated_at).to.be.a('string');
+            });
+  - name: Avatar
+    meta:
+      id: fld_avatar
+      sortKey: -1500000000000
+      description: |
+        Account avatar upload and retrieval. Upload is multipart/form-data with
+        an `image` field. The account ID in the path must match the authenticated
+        user. The GET endpoint returns a presigned S3 URL for the image.
+    children:
+      - name: Get Avatar
+        meta:
+          id: req_get_avatar
+          sortKey: -1500000000001
+          description: |
+            Fetches the avatar for an account. Responds 200 with the avatar
+            metadata and a presigned `image_url`. 404 when no avatar exists.
+        url: "{{ _.base_url }}/v1/avatars/{{ _.user_id }}"
+        method: GET
+        headers:
+          - name: Accept
+            value: application/json
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('get avatar returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.account_id).to.be.a('string');
+              insomnia.expect(body.data.image_url).to.be.a('string');
+            });
+      - name: Upload Avatar
+        meta:
+          id: req_upload_avatar
+          sortKey: -1500000000002
+          description: |
+            Uploads or replaces the avatar for the authenticated account. The
+            `image` field must be a valid image (jpeg, png, webp, gif) under
+            5MB. The path account_id must match the authenticated user.
+            Responds 200 with the avatar metadata and presigned `image_url`.
+            401 without auth, 403 when account_id doesn't match auth, 400 for
+            missing or invalid image, 500 for storage errors.
+        url: "{{ _.base_url }}/v1/avatars/{{ _.user_id }}"
+        method: PUT
+        headers:
+          - name: Content-Type
+            value: multipart/form-data
+        parameters:
+          - name: image
+            value: ""
+            fileName: "avatar.jpg"
+            type: file
+        scripts:
+          afterResponse: |-
+            const body = insomnia.response.json();
+            insomnia.test('upload avatar returns 200', () => {
+              insomnia.expect(insomnia.response.status).to.eql(200);
+              insomnia.expect(body.success).to.eql(true);
+              insomnia.expect(body.data.account_id).to.be.a('string');
+              insomnia.expect(body.data.image_url).to.be.a('string');
+            });
+
+environments:
+  name: Base Environment
+  meta:
+    id: env_minimart_base
+  data:
+    base_url: http://localhost:8080
+    user_id: u1
+    product_id: ""
+    product_version: ""
+    product_etag: ""
+    category_id: ""
+    category_version: ""
+    category_etag: ""
+    cart_id: ""
+    cart_order_id: ""
+    cart_subtotal_cents: 0
+    shipping_method_id: ""
+    shipping_quote_id: ""
+    address_id: ""
+    shipment_id: ""
+    order_id: ""
+    payment_id: ""
+    customer_id: ""
+    customer_version: ""
+    customer_etag: ""
+    idempotency_key: "idem-test-123"
+    notification_id: ""
+    showcase_product_id: ""

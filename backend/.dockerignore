@@ -1,0 +1,37 @@
+# Build artifacts
+minimart
+test.test
+coverage.*
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in build context)
+features/
+collections/
+deployments/
+memory-bank/
+*.md
+.github/
+
+# Generated docs (kept: docs/docs.go is compiled)
+docs/swagger.json
+docs/swagger.yaml
+
+# Testcontainers
+/testcontainers-*

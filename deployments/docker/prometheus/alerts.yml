@@ -1,0 +1,73 @@
+groups:
+  - name: minimart_rate_limit
+    rules:
+      - alert: MiniMartRateLimitHighRejection
+        expr: 100 * sum(rate(minimart_ratelimit_requests_total{result="throttled"}[5m])) / sum(rate(minimart_ratelimit_requests_total[5m])) > 5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Rate limiter rejecting more than 5% of requests"
+      - alert: MiniMartRateLimitBlockedSpike
+        expr: sum(rate(minimart_ratelimit_requests_total{result="throttled"}[5m])) > 10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 10 blocked requests/sec"
+  - name: minimart_redis
+    rules:
+      - alert: MiniMartRedisDown
+        expr: minimart_redis_up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis is unreachable"
+      - alert: MiniMartRedisBreakerOpen
+        expr: minimart_redis_breaker_state == 2
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Redis circuit breaker is open"
+      - alert: MiniMartRedisPoolSaturated
+        expr: minimart_redis_pool_total_connections / minimart_redis_pool_max_connections > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Redis pool near capacity"
+      - alert: MiniMartRedisHighLatency
+        expr: histogram_quantile(0.99, sum by (le) (rate(minimart_redis_command_duration_seconds_bucket[5m]))) > 0.1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Redis p99 latency above 100ms"
+  - name: minimart_kafka
+    rules:
+      - alert: MiniMartKafkaConsumerLagHigh
+        expr: max by (topic, group) (minimart_kafka_consumer_lag) > 1000
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Kafka consumer lag above 1000 messages"
+      - alert: MiniMartKafkaDeadLettering
+        expr: sum by (topic, group, disposition) (rate(minimart_kafka_dead_lettered_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Messages are being dead-lettered"
+      - alert: MiniMartKafkaConsumerPaused
+        expr: max by (topic, group) (minimart_kafka_consumer_paused) == 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Kafka consumer paused by backpressure gate"
+      - alert: MiniMartKafkaConsumerRestarts
+        expr: increase(minimart_kafka_consumer_restarts_total[15m]) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Kafka consumer restarted unexpectedly"
+      - alert: MiniMartKafkaDLQReplayParked
+        expr: increase(minimart_kafka_dlq_replay_parked_total[1h]) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "DLQ replay parked a message after reaching the replay cap"
