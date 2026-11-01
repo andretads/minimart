@@ -1,0 +1,59 @@
+name: Migrate
+run-name: Migrate production by @${{ github.actor }}
+
+on:
+  # Manual runs from the Actions tab.
+  workflow_dispatch:
+  # Auto-apply whenever migrations land on main. Pair this with protection rules
+  # on the `production` environment to require approval before it runs.
+  push:
+    branches: [main]
+    paths:
+      - "backend/db/migrations/**"
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Migrate production
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    concurrency:
+      group: migrate-production
+      # Never interrupt a migration that is already running.
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # Fail fast if the environment secret is missing, so dbmate never silently
+      # falls back to its localhost default.
+      - name: Ensure DATABASE_URL is configured
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set for the 'production' environment"
+            exit 1
+          fi
+
+      - name: Generate docs
+        run: make docs
+
+      # dbmate reads ./db/migrations relative to the working directory (backend/).
+      # It creates the database if missing and is safe to re-run.
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: go run . migrate

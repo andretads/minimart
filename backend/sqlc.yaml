@@ -1,0 +1,204 @@
+version: "2"
+
+# Each domain gets a separate reader and writer package, generated from that
+# domain's queries.sql. The schema source of truth is the dbmate migrations, so
+# sqlc and the database can never drift. Regenerate with `sqlc generate`.
+# Never hand-edit the generated *.sql.go / models.go / db.go files.
+sql:
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/catalog/infrastructure/postgres/reader/queries.sql"
+    gen:
+      go: &go
+        package: "reader"
+        out: "internal/catalog/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/catalog/infrastructure/postgres/writer/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "writer"
+        out: "internal/catalog/infrastructure/postgres/writer"
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/order/infrastructure/postgres/reader/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "reader"
+        out: "internal/order/infrastructure/postgres/reader"
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/order/infrastructure/postgres/writer/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "writer"
+        out: "internal/order/infrastructure/postgres/writer"
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/payment/infrastructure/postgres/reader/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "reader"
+        out: "internal/payment/infrastructure/postgres/reader"
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/payment/infrastructure/postgres/writer/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "writer"
+        out: "internal/payment/infrastructure/postgres/writer"
+
+  # The transactional outbox is shared infrastructure (pkg/outbox), so its
+  # generated queries live next to the reusable Store adapter rather than in a
+  # domain package.
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "pkg/outbox/postgres/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "postgres"
+        out: "pkg/outbox/postgres"
+  - name: customer_reader
+    schema: "db/migrations"
+    queries: "internal/customer/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/customer/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: customer_writer
+    schema: "db/migrations"
+    queries: "internal/customer/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/customer/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
+
+  - name: auth_reader
+    schema: "db/migrations"
+    queries: "internal/auth/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/auth/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: auth_writer
+    schema: "db/migrations"
+    queries: "internal/auth/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/auth/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
+
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/showcase/infrastructure/postgres/reader/queries.sql"
+    gen:
+      go:
+        <<: *go
+        package: "reader"
+        out: "internal/showcase/infrastructure/postgres/reader"
+
+  - name: category_reader
+    schema: "db/migrations"
+    queries: "internal/category/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/category/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: category_writer
+    schema: "db/migrations"
+    queries: "internal/category/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/category/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
+
+  - name: address_reader
+    schema: "db/migrations"
+    queries: "internal/address/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/address/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: address_writer
+    schema: "db/migrations"
+    queries: "internal/address/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/address/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
+
+  - name: avatar_reader
+    schema: "db/migrations"
+    queries: "internal/avatar/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/avatar/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: avatar_writer
+    schema: "db/migrations"
+    queries: "internal/avatar/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/avatar/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
+
+  - name: shipping_reader
+    schema: "db/migrations"
+    queries: "internal/shipping/infrastructure/postgres/reader/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/shipping/infrastructure/postgres/reader"
+        sql_package: "pgx/v5"
+  - name: shipping_writer
+    schema: "db/migrations"
+    queries: "internal/shipping/infrastructure/postgres/writer/queries.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "writer"
+        out: "internal/shipping/infrastructure/postgres/writer"
+        sql_package: "pgx/v5"
