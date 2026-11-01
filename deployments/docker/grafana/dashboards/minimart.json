@@ -1,0 +1,2997 @@
+{
+  "title": "MiniMart - Dashboard",
+  "uid": "minimart-dashboard",
+  "tags": [
+    "golang",
+    "prometheus",
+    "sre"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 2,
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "endpoint",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "query": "label_values(minimart_http_requests_total, endpoint)",
+        "refresh": 1,
+        "includeAll": true
+      },
+      {
+        "name": "method",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "query": "label_values(minimart_http_requests_total, method)",
+        "refresh": 1,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Latency (p95)",
+      "id": 1,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(minimart_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 latency"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 by Endpoint",
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(minimart_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 (Filtered)",
+      "id": 3,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(minimart_http_request_duration_seconds_bucket{endpoint=~\"$endpoint\", method=~\"$method\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency (p50)",
+      "id": 4,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(minimart_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50 latency"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Traffic (Requests per second)",
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total[1m]))",
+          "legendFormat": "RPS"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Traffic by Endpoint & Method",
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total{endpoint=~\"$endpoint\", method=~\"$method\"}[1m])) by (endpoint, method)",
+          "legendFormat": "{{method}} {{endpoint}}"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors (5xx rate)",
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total{status=~\"5..\"}[1m]))",
+          "legendFormat": "5xx errors"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors by Endpoint",
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total{status=~\"5..\", endpoint=~\"$endpoint\"}[1m])) by (endpoint)",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate (%)",
+      "id": 9,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(minimart_http_requests_total[5m])) * 100",
+          "legendFormat": "error %"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate (%) by Endpoint",
+      "id": 10,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_requests_total{status=~\"5..\", endpoint=~\"$endpoint\"}[5m])) by (endpoint) / sum(rate(minimart_http_requests_total{endpoint=~\"$endpoint\"}[5m])) by (endpoint) * 100",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "SLO Compliance (Latency < 300ms)",
+      "id": 11,
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_http_request_duration_seconds_bucket{le=\"0.3\", endpoint=~\"$endpoint\"}[5m])) by (endpoint) / sum(rate(minimart_http_request_duration_seconds_count{endpoint=~\"$endpoint\"}[5m])) by (endpoint)",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "SLO Error Budget Burn Rate",
+      "id": 12,
+      "targets": [
+        {
+          "expr": "(1 - (sum(rate(minimart_http_request_duration_seconds_bucket{le=\"0.3\"}[5m])) / sum(rate(minimart_http_request_duration_seconds_count[5m])))) / (1 - 0.95)",
+          "legendFormat": "burn rate"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Top 5 Slowest Endpoints (p95)",
+      "id": 13,
+      "targets": [
+        {
+          "expr": "topk(5, histogram_quantile(0.95, sum(rate(minimart_http_request_duration_seconds_bucket[5m])) by (le, endpoint)))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Saturation Score",
+      "id": 14,
+      "targets": [
+        {
+          "expr": "((rate(process_cpu_seconds_total[1m])) + (process_resident_memory_bytes / 1000000000) + (go_goroutines / 1000)) / 3",
+          "legendFormat": "saturation"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "CPU Usage (Current)",
+      "id": 15,
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m])",
+          "legendFormat": "CPU"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 64,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Memory Usage (Current)",
+      "id": 16,
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "Memory"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500000000
+              },
+              {
+                "color": "red",
+                "value": 1000000000
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 64,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage",
+      "id": 17,
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m])",
+          "legendFormat": "CPU"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage (RSS)",
+      "id": 18,
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "memory"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 72,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutines",
+      "id": 19,
+      "targets": [
+        {
+          "expr": "go_goroutines",
+          "legendFormat": "goroutines"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 72,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Duration (p99)",
+      "id": 20,
+      "targets": [
+        {
+          "expr": "go_gc_duration_seconds{quantile=\"0.99\"}",
+          "legendFormat": "GC p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Goroutine Spike Ratio",
+      "id": 21,
+      "targets": [
+        {
+          "expr": "go_goroutines / avg_over_time(go_goroutines[5m])",
+          "legendFormat": "spike"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutine Growth Rate",
+      "id": 22,
+      "targets": [
+        {
+          "expr": "deriv(go_goroutines[5m])",
+          "legendFormat": "growth"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "DB Pool Utilization",
+      "id": 23,
+      "targets": [
+        {
+          "expr": "minimart_db_pool_acquired_connections / minimart_db_pool_max_connections",
+          "legendFormat": "utilization"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 6,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Pool Connections",
+      "id": 24,
+      "targets": [
+        {
+          "expr": "minimart_db_pool_acquired_connections",
+          "legendFormat": "acquired"
+        },
+        {
+          "expr": "minimart_db_pool_idle_connections",
+          "legendFormat": "idle"
+        },
+        {
+          "expr": "minimart_db_pool_total_connections",
+          "legendFormat": "total"
+        },
+        {
+          "expr": "minimart_db_pool_max_connections",
+          "legendFormat": "max"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 96,
+        "w": 18,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Pool Pressure (Acquired Connections)",
+      "id": 25,
+      "targets": [
+        {
+          "expr": "minimart_db_pool_acquired_connections",
+          "legendFormat": "in use"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 104,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "DB Max Connections",
+      "id": 26,
+      "targets": [
+        {
+          "expr": "minimart_db_pool_max_connections",
+          "legendFormat": "max"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "none"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 104,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "HTTP - Additional",
+      "id": 27,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 112,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "HTTP In-Flight Requests",
+      "targets": [
+        {
+          "expr": "minimart_http_requests_in_flight",
+          "legendFormat": "in-flight",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 28,
+      "gridPos": {
+        "x": 0,
+        "y": 113,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Requests by Status",
+      "targets": [
+        {
+          "expr": "sum by (status)(rate(minimart_http_requests_total[5m]))",
+          "legendFormat": "{{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 29,
+      "gridPos": {
+        "x": 8,
+        "y": 113,
+        "w": 16,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Redis",
+      "id": 30,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 121,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis Commands Rate",
+      "targets": [
+        {
+          "expr": "sum by (command)(rate(minimart_redis_commands_total[5m]))",
+          "legendFormat": "{{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 31,
+      "gridPos": {
+        "x": 0,
+        "y": 122,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis Command Latency",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, command)(rate(minimart_redis_command_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, command)(rate(minimart_redis_command_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99 {{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "id": 32,
+      "gridPos": {
+        "x": 12,
+        "y": 122,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis Pool Connections",
+      "targets": [
+        {
+          "expr": "minimart_redis_pool_total_connections",
+          "legendFormat": "total",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "minimart_redis_pool_idle_connections",
+          "legendFormat": "idle",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "minimart_redis_pool_stale_connections",
+          "legendFormat": "stale",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "minimart_redis_pool_max_connections",
+          "legendFormat": "max",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 33,
+      "gridPos": {
+        "x": 0,
+        "y": 130,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis Pool Hits / Misses / Timeouts",
+      "targets": [
+        {
+          "expr": "rate(minimart_redis_pool_hits_total[5m])",
+          "legendFormat": "hits",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "rate(minimart_redis_pool_misses_total[5m])",
+          "legendFormat": "misses",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "rate(minimart_redis_pool_timeouts_total[5m])",
+          "legendFormat": "timeouts",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 34,
+      "gridPos": {
+        "x": 12,
+        "y": 130,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Redis Pool Utilization",
+      "targets": [
+        {
+          "expr": "minimart_redis_pool_total_connections / minimart_redis_pool_max_connections",
+          "legendFormat": "utilization",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 35,
+      "gridPos": {
+        "x": 0,
+        "y": 138,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis Circuit Breaker State",
+      "targets": [
+        {
+          "expr": "minimart_redis_breaker_state",
+          "legendFormat": "{{name}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 36,
+      "gridPos": {
+        "x": 8,
+        "y": 138,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Rate Limiting & Idempotency",
+      "id": 37,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 146,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate Limit Decisions",
+      "targets": [
+        {
+          "expr": "sum by (result)(rate(minimart_ratelimit_requests_total[5m]))",
+          "legendFormat": "{{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 38,
+      "gridPos": {
+        "x": 0,
+        "y": 147,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate Limit by Scope",
+      "targets": [
+        {
+          "expr": "sum by (scope, result)(rate(minimart_ratelimit_requests_total[5m]))",
+          "legendFormat": "{{scope}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 39,
+      "gridPos": {
+        "x": 12,
+        "y": 147,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate Limit Remaining Tokens",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le)(rate(minimart_ratelimit_remaining_tokens_bucket[5m])))",
+          "legendFormat": "p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le)(rate(minimart_ratelimit_remaining_tokens_bucket[5m])))",
+          "legendFormat": "p90",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 40,
+      "gridPos": {
+        "x": 0,
+        "y": 155,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Idempotency Outcomes",
+      "targets": [
+        {
+          "expr": "sum by (scope, result)(rate(minimart_idempotency_events_total[5m]))",
+          "legendFormat": "{{scope}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 41,
+      "gridPos": {
+        "x": 12,
+        "y": 155,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Kafka",
+      "id": 42,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 163,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Published",
+      "targets": [
+        {
+          "expr": "sum by (topic, status)(rate(minimart_kafka_messages_published_total[5m]))",
+          "legendFormat": "{{topic}} {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "msg/s"
+        }
+      },
+      "id": 43,
+      "gridPos": {
+        "x": 0,
+        "y": 164,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Consumed",
+      "targets": [
+        {
+          "expr": "sum by (topic, group, status)(rate(minimart_kafka_messages_consumed_total[5m]))",
+          "legendFormat": "{{topic}} {{group}} {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "msg/s"
+        }
+      },
+      "id": 44,
+      "gridPos": {
+        "x": 12,
+        "y": 164,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Publish Latency",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, topic)(rate(minimart_kafka_publish_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99 {{topic}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "id": 45,
+      "gridPos": {
+        "x": 0,
+        "y": 172,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Consume Latency",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, topic, group)(rate(minimart_kafka_consume_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99 {{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "id": 46,
+      "gridPos": {
+        "x": 12,
+        "y": 172,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Retries",
+      "targets": [
+        {
+          "expr": "sum by (topic, group)(rate(minimart_kafka_retries_total[5m]))",
+          "legendFormat": "{{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 47,
+      "gridPos": {
+        "x": 0,
+        "y": 180,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Dead-Lettered",
+      "targets": [
+        {
+          "expr": "sum by (topic, group, disposition)(rate(minimart_kafka_dead_lettered_total[5m]))",
+          "legendFormat": "{{topic}} {{group}} {{disposition}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "msg/s"
+        }
+      },
+      "id": 48,
+      "gridPos": {
+        "x": 12,
+        "y": 180,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Consumer Restarts",
+      "targets": [
+        {
+          "expr": "sum by (topic, group)(rate(minimart_kafka_consumer_restarts_total[5m]))",
+          "legendFormat": "{{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 49,
+      "gridPos": {
+        "x": 0,
+        "y": 188,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Consumer Lag",
+      "targets": [
+        {
+          "expr": "max by (topic, group)(minimart_kafka_consumer_lag)",
+          "legendFormat": "{{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 90,
+      "gridPos": {
+        "x": 12,
+        "y": 188,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Backpressure Waits",
+      "targets": [
+        {
+          "expr": "sum by (topic, group)(rate(minimart_kafka_backpressure_waits_total[5m]))",
+          "legendFormat": "{{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 91,
+      "gridPos": {
+        "x": 0,
+        "y": 196,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Consumer Paused",
+      "targets": [
+        {
+          "expr": "max by (topic, group)(minimart_kafka_consumer_paused)",
+          "legendFormat": "{{topic}} {{group}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 92,
+      "gridPos": {
+        "x": 12,
+        "y": 196,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka DLQ Replay Parked",
+      "targets": [
+        {
+          "expr": "sum by (topic)(increase(minimart_kafka_dlq_replay_parked_total[1h]))",
+          "legendFormat": "{{topic}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 93,
+      "gridPos": {
+        "x": 0,
+        "y": 204,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Orders & Payments",
+      "id": 50,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 212,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Orders",
+      "targets": [
+        {
+          "expr": "sum by (status)(rate(minimart_order_placed_total[5m]))",
+          "legendFormat": "placed {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum by (status)(rate(minimart_order_cancelled_total[5m]))",
+          "legendFormat": "cancelled {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum by (status)(rate(minimart_order_payment_applied_total[5m]))",
+          "legendFormat": "payment_applied {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 51,
+      "gridPos": {
+        "x": 0,
+        "y": 213,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Order Amount",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le)(rate(minimart_order_amount_cents_bucket[5m])))",
+          "legendFormat": "p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le)(rate(minimart_order_amount_cents_bucket[5m])))",
+          "legendFormat": "p90",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le)(rate(minimart_order_amount_cents_bucket[5m])))",
+          "legendFormat": "p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 52,
+      "gridPos": {
+        "x": 12,
+        "y": 213,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Payments by State",
+      "targets": [
+        {
+          "expr": "sum by (state)(rate(minimart_payment_events_total[5m]))",
+          "legendFormat": "{{state}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 53,
+      "gridPos": {
+        "x": 0,
+        "y": 221,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Payment Amount",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le)(rate(minimart_payment_amount_cents_bucket[5m])))",
+          "legendFormat": "p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le)(rate(minimart_payment_amount_cents_bucket[5m])))",
+          "legendFormat": "p90",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le)(rate(minimart_payment_amount_cents_bucket[5m])))",
+          "legendFormat": "p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 54,
+      "gridPos": {
+        "x": 12,
+        "y": 221,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Cart & Wishlist",
+      "id": 55,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 229,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Cart Operations",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_cart_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_retrieved_total[5m]))",
+          "legendFormat": "retrieved",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_item_added_total[5m]))",
+          "legendFormat": "item_added",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_item_updated_total[5m]))",
+          "legendFormat": "item_updated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_item_removed_total[5m]))",
+          "legendFormat": "item_removed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_cleared_total[5m]))",
+          "legendFormat": "cleared",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_checkout_total[5m]))",
+          "legendFormat": "checkout",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_cart_consumed_total[5m]))",
+          "legendFormat": "consumed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 56,
+      "gridPos": {
+        "x": 0,
+        "y": 230,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Wishlist Operations",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_wishlist_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_wishlist_retrieved_total[5m]))",
+          "legendFormat": "retrieved",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_wishlist_item_added_total[5m]))",
+          "legendFormat": "item_added",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_wishlist_item_removed_total[5m]))",
+          "legendFormat": "item_removed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_wishlist_cleared_total[5m]))",
+          "legendFormat": "cleared",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 57,
+      "gridPos": {
+        "x": 12,
+        "y": 230,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Catalog, Stock & Category",
+      "id": 58,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 238,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Products",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_product_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_product_updated_total[5m]))",
+          "legendFormat": "updated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 59,
+      "gridPos": {
+        "x": 0,
+        "y": 239,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stock",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_stock_reserved_total[5m]))",
+          "legendFormat": "reserved",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_stock_released_total[5m]))",
+          "legendFormat": "released",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 60,
+      "gridPos": {
+        "x": 12,
+        "y": 239,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Categories",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_category_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_category_updated_total[5m]))",
+          "legendFormat": "updated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_category_deleted_total[5m]))",
+          "legendFormat": "deleted",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 61,
+      "gridPos": {
+        "x": 0,
+        "y": 247,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Customer & Address",
+      "id": 62,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 255,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Customers",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_customer_ensured_total[5m]))",
+          "legendFormat": "ensured",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_customer_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_customer_updated_total[5m]))",
+          "legendFormat": "updated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_customer_deactivated_total[5m]))",
+          "legendFormat": "deactivated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 63,
+      "gridPos": {
+        "x": 0,
+        "y": 256,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Addresses",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_address_created_total[5m]))",
+          "legendFormat": "created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_address_fetched_total[5m]))",
+          "legendFormat": "fetched",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_address_listed_total[5m]))",
+          "legendFormat": "listed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_address_updated_total[5m]))",
+          "legendFormat": "updated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_address_deleted_total[5m]))",
+          "legendFormat": "deleted",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_address_default_set_total[5m]))",
+          "legendFormat": "default_set",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 64,
+      "gridPos": {
+        "x": 12,
+        "y": 256,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Notifications",
+      "id": 65,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 264,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Notifications",
+      "targets": [
+        {
+          "expr": "sum by (status)(rate(minimart_notification_sent_total[5m]))",
+          "legendFormat": "sent {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum by (status)(rate(minimart_notification_preferences_updated_total[5m]))",
+          "legendFormat": "prefs {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 66,
+      "gridPos": {
+        "x": 0,
+        "y": 265,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Notifications Suppressed",
+      "targets": [
+        {
+          "expr": "sum by (type)(rate(minimart_notification_suppressed_total[5m]))",
+          "legendFormat": "{{type}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 67,
+      "gridPos": {
+        "x": 12,
+        "y": 265,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Shipping - Methods & Zones",
+      "id": 68,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 273,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipping Methods",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_methods_list_total[5m]))",
+          "legendFormat": "list",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_method_get_total[5m]))",
+          "legendFormat": "get",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_method_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_method_update_total[5m]))",
+          "legendFormat": "update",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 69,
+      "gridPos": {
+        "x": 0,
+        "y": 274,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipping Zones",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_zones_list_total[5m]))",
+          "legendFormat": "list",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_zone_get_total[5m]))",
+          "legendFormat": "get",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_zone_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_zone_update_total[5m]))",
+          "legendFormat": "update",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 70,
+      "gridPos": {
+        "x": 12,
+        "y": 274,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Shipping - Rates & Quotes",
+      "id": 71,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 282,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipping Rates",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_rates_list_total[5m]))",
+          "legendFormat": "list",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_rate_get_total[5m]))",
+          "legendFormat": "get",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_rate_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_rate_update_total[5m]))",
+          "legendFormat": "update",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 72,
+      "gridPos": {
+        "x": 0,
+        "y": 283,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipping Quotes",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_quote_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_quote_get_total[5m]))",
+          "legendFormat": "get",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_quote_validate_total[5m]))",
+          "legendFormat": "validate",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_quote_price_total[5m]))",
+          "legendFormat": "price",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_quotes_expire_total[5m]))",
+          "legendFormat": "expire",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 73,
+      "gridPos": {
+        "x": 12,
+        "y": 283,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Shipping - Shipments & Tracking",
+      "id": 74,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 291,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipment Lifecycle",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_create_from_order_paid_total[5m]))",
+          "legendFormat": "create_from_order_paid",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_get_total[5m]))",
+          "legendFormat": "get",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_list_total[5m]))",
+          "legendFormat": "list",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 75,
+      "gridPos": {
+        "x": 0,
+        "y": 292,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Shipment Processing",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_process_total[5m]))",
+          "legendFormat": "process",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_dispatch_total[5m]))",
+          "legendFormat": "dispatch",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_shipment_deliver_total[5m]))",
+          "legendFormat": "deliver",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 76,
+      "gridPos": {
+        "x": 12,
+        "y": 292,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tracking Events",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_shipping_tracking_event_create_total[5m]))",
+          "legendFormat": "create",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_shipping_tracking_event_list_total[5m]))",
+          "legendFormat": "list",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 77,
+      "gridPos": {
+        "x": 0,
+        "y": 300,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Auth, Authz & Avatar",
+      "id": 78,
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 308,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Auth Events",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_auth_account_created_total[5m]))",
+          "legendFormat": "account_created",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_auth_authenticated_total[5m]))",
+          "legendFormat": "authenticated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_auth_password_changed_total[5m]))",
+          "legendFormat": "password_changed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_auth_token_refreshed_total[5m]))",
+          "legendFormat": "token_refreshed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_auth_role_assigned_total[5m]))",
+          "legendFormat": "role_assigned",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_auth_permissions_loaded_total[5m]))",
+          "legendFormat": "permissions_loaded",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 79,
+      "gridPos": {
+        "x": 0,
+        "y": 309,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Authz Denied",
+      "targets": [
+        {
+          "expr": "sum by (status)(rate(minimart_authz_denied_total[5m]))",
+          "legendFormat": "{{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 80,
+      "gridPos": {
+        "x": 12,
+        "y": 309,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Avatar",
+      "targets": [
+        {
+          "expr": "sum(rate(minimart_avatar_uploaded_total[5m]))",
+          "legendFormat": "uploaded",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(minimart_avatar_fetched_total[5m]))",
+          "legendFormat": "fetched",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s"
+        }
+      },
+      "id": 81,
+      "gridPos": {
+        "x": 0,
+        "y": 317,
+        "w": 12,
+        "h": 8
+      }
+    }
+  ]
+}
